@@ -1,11 +1,14 @@
 import express from "express";
 import cors from "cors";
+import dotenv from "dotenv";
 import mongoose from "mongoose";
 import amg_router from "./Routes/amg-user.js";
 
+dotenv.config();
+
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/dhr-backend";
+const MONGODB_URI = process.env.MONGODB_URI;
 
 mongoose
   .connect(MONGODB_URI)
@@ -20,5 +23,5 @@ app.use(express.json());
 app.use("/amg-securities", amg_router);
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://13.201.136.84:${PORT}`);
 });
