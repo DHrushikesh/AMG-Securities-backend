@@ -4,7 +4,7 @@ import User from '../Models/User.js';
 
 export async function register(req, res) {
   try {
-    const { fullName, username, password, phone } = req.body;
+    const { fullName, username, password, phone, role } = req.body;
     if (!fullName || !username || !password || !phone) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -15,7 +15,7 @@ export async function register(req, res) {
     }
 
     const hashed = await bcrypt.hash(password, 10);
-    const user = new User({ fullName, username, password: hashed, phone });
+    const user = new User({ fullName, username, password: hashed, phone ,role: role || 'user' });
     await user.save();
 
     const safeUser = user.toObject();
