@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
+console.log("JWT_SECRET:", process.env.JWT_SECRET);
 
 export function authenticate(req, res, next) {
   const authHeader = req.headers.authorization || req.headers.Authorization;
