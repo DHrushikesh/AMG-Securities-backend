@@ -1,1 +1,8 @@
 *.env
+node_modules/
+dist/
+logs/
+coverage/
+.DS_Store
+# Ignore database files
+*.db

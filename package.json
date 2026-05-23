@@ -9,7 +9,7 @@
   },
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "This repository is an Express.js backend for user registration and login. It now stores users in MongoDB instead of a local JSON file, which is better suited for EC2 or any cloud deployment.",
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
@@ -18,5 +18,14 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.2",
     "nodemon": "^3.1.14"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DHrushikesh/AMG-Securities-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DHrushikesh/AMG-Securities-backend/issues"
+  },
+  "homepage": "https://github.com/DHrushikesh/AMG-Securities-backend#readme"
 }
