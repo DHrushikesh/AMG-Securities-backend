@@ -57,3 +57,13 @@ export async function login(req, res) {
     return res.status(500).json({ error: 'Server error' });
   }
 }
+
+export async function getAllUsers(req, res) {
+  try {
+    const users = await User.find({}, '-password').lean().exec();
+    return res.json({ users });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}

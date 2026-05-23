@@ -1,14 +1,32 @@
 import express from "express";
-import { register, login } from "../Controllers/userController.js";
+import { register, login, getAllUsers } from "../Controllers/userController.js";
+import { authenticate, adminOnly, managerOnly, userOnly } from "../middleawre/middleware.js";
 
 const amg_router = express.Router();
 
 amg_router.post('/register', register);
 amg_router.post('/login', login);
 
-
-amg_router.get('/test', (req, res) => {
+amg_router.get('/test', authenticate , (req, res) => {
   res.json({ message: 'AMG User route is working!' });
+});
+
+
+amg_router.get('/users', authenticate, managerOnly, getAllUsers);
+
+
+// Test routes to verify authentication and role-based access control
+amg_router.get('/profile', authenticate, (req, res) => {
+  res.json({ message: 'Authenticated user', user: req.user });
+});
+amg_router.get('/admin-area', authenticate, adminOnly, (req, res) => {
+  res.json({ message: 'Admin access granted', user: req.user });
+});
+amg_router.get('/manager-area', authenticate, managerOnly, (req, res) => {
+  res.json({ message: 'Manager access granted', user: req.user });
+});
+amg_router.get('/user-area', authenticate, userOnly, (req, res) => {
+  res.json({ message: 'User access granted', user: req.user });
 });
 
 export default amg_router;
