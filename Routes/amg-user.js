@@ -1,5 +1,5 @@
 import express from "express";
-import { register, login, getAllUsers } from "../Controllers/userController.js";
+import { register, login, getAllUsers, updateUser, sendContactMail } from "../Controllers/userController.js";
 import { authenticate, adminOnly, managerOnly, userOnly } from "../middleawre/middleware.js";
 
 const amg_router = express.Router();
@@ -11,9 +11,10 @@ amg_router.get('/test', authenticate , (req, res) => {
   res.json({ message: 'AMG User route is working!' });
 });
 
-
+// Editinguser
 amg_router.get('/users', authenticate, managerOnly, getAllUsers);
-
+amg_router.put('/users/:id', authenticate, managerOnly, updateUser);
+amg_router.post('/contact', sendContactMail);
 
 // Test routes to verify authentication and role-based access control
 amg_router.get('/profile', authenticate, (req, res) => {

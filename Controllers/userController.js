@@ -1,5 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
+import nodemailer from 'nodemailer';
 import User from '../Models/User.js';
 
 export async function register(req, res) {
@@ -64,6 +66,97 @@ export async function getAllUsers(req, res) {
     return res.json({ users });
   } catch (err) {
     console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+export async function sendContactMail(req, res) {
+  try {
+    const { email, phone, company, services, message } = req.body;
+
+    if (!email || !phone || !company || !services) {
+      return res.status(400).json({ error: 'Missing required contact fields' });
+    }
+
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const recipient = process.env.CONTACT_TO_EMAIL || smtpUser;
+
+    if (!smtpHost || !smtpUser || !smtpPass || !recipient) {
+      return res.status(500).json({ error: 'Email sender is not configured' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    });
+
+    const mailOptions = {
+      from: smtpUser,
+      to: recipient,
+      replyTo: email,
+      subject: `New contact form submission from ${company}`,
+      text: `New contact form submission:\n\nEmail: ${email}\nPhone: ${phone}\nCompany: ${company}\nServices: ${services}\nMessage: ${message || 'N/A'}`,
+      html: `
+        <h2>New contact form submission</h2>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Phone:</strong> ${phone}</p>
+        <p><strong>Company:</strong> ${company}</p>
+        <p><strong>Services:</strong> ${services}</p>
+        <p><strong>Message:</strong> ${message || 'N/A'}</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return res.json({ message: 'Contact email sent successfully' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to send contact email' });
+  }
+}
+
+export async function updateUser(req, res) {
+  try {
+    const { id } = req.params;
+    const updates = { ...req.body };
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    if (updates.password) {
+      updates.password = await bcrypt.hash(updates.password, 10);
+    }
+
+    const allowedFields = ['fullName', 'username', 'phone', 'role', 'password'];
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key]) => allowedFields.includes(key))
+    );
+
+    const user = await User.findByIdAndUpdate(id, filteredUpdates, {
+      returnDocument: 'after',
+      runValidators: true,
+      context: 'query',
+    }).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({ message: 'User updated successfully', user });
+  } catch (err) {
+    console.error(err);
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
     return res.status(500).json({ error: 'Server error' });
   }
 }
