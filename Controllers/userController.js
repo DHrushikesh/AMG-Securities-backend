@@ -70,6 +70,40 @@ export async function getAllUsers(req, res) {
   }
 }
 
+async function sendViaBrevoApi({ senderEmail, recipientEmail, subject, text, html, replyTo }) {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing BREVO_API_KEY for Brevo API email delivery');
+  }
+
+  const payload = {
+    sender: { email: senderEmail },
+    to: [{ email: recipientEmail }],
+    subject,
+    textContent: text,
+    htmlContent: html,
+    replyTo: { email: replyTo },
+  };
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': apiKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    const err = new Error(`Brevo API request failed: ${response.status} ${response.statusText} - ${body}`);
+    err.status = response.status;
+    throw err;
+  }
+
+  return response.json();
+}
+
 export async function sendContactMail(req, res) {
   try {
     const { email, phone, company, services, message } = req.body;
@@ -78,47 +112,68 @@ export async function sendContactMail(req, res) {
       return res.status(400).json({ error: 'Missing required contact fields' });
     }
 
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const recipient = process.env.CONTACT_TO_EMAIL || smtpUser;
+    const senderEmail = process.env.SENDER_EMAIL;
+    const recipientEmail = email;
+    const useBrevoApi = Boolean(process.env.BREVO_API_KEY);
 
-    if (!smtpHost || !smtpUser || !smtpPass || !recipient) {
-      return res.status(500).json({ error: 'Email sender is not configured' });
+    if (!senderEmail || !recipientEmail) {
+      return res.status(500).json({ error: 'Email sender or recipient is not configured' });
     }
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    });
+    const subject = `New contact form submission from ${company}`;
+    const text = `New contact form submission:\n\nEmail: ${email}\nPhone: ${phone}\nCompany: ${company}\nServices: ${services}\nMessage: ${message || 'N/A'}`;
+    const html = `
+      <h2>New contact form submission</h2>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Phone:</strong> ${phone}</p>
+      <p><strong>Company:</strong> ${company}</p>
+      <p><strong>Services:</strong> ${services}</p>
+      <p><strong>Message:</strong> ${message || 'N/A'}</p>
+    `;
 
-    const mailOptions = {
-      from: smtpUser,
-      to: recipient,
-      replyTo: email,
-      subject: `New contact form submission from ${company}`,
-      text: `New contact form submission:\n\nEmail: ${email}\nPhone: ${phone}\nCompany: ${company}\nServices: ${services}\nMessage: ${message || 'N/A'}`,
-      html: `
-        <h2>New contact form submission</h2>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Phone:</strong> ${phone}</p>
-        <p><strong>Company:</strong> ${company}</p>
-        <p><strong>Services:</strong> ${services}</p>
-        <p><strong>Message:</strong> ${message || 'N/A'}</p>
-      `,
-    };
+    if (useBrevoApi) {
+      await sendViaBrevoApi({
+        senderEmail,
+        recipientEmail,
+        subject,
+        text,
+        html,
+        replyTo: email,
+      });
+    } else {
+      const smtpHost = process.env.SMTP_HOST;
+      const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
+      const smtpPass = process.env.SMTP_PASS;
 
-    await transporter.sendMail(mailOptions);
+      if (!smtpHost || !smtpPass) {
+        return res.status(500).json({ error: 'SMTP connection details are not configured' });
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: { user: senderEmail, pass: smtpPass },
+      });
+
+      await transporter.sendMail({
+        from: senderEmail,
+        to: recipientEmail,
+        replyTo: email,
+        subject,
+        text,
+        html,
+      });
+    }
 
     return res.json({ message: 'Contact email sent successfully' });
   } catch (err) {
-    console.error(err);
+    console.error('Contact mail error:', err);
+
+    if (err.status === 401 || err.status === 403 || err.code === 'EAUTH') {
+      return res.status(502).json({ error: 'Email provider authentication failed' });
+    }
+
     return res.status(500).json({ error: 'Failed to send contact email' });
   }
 }
