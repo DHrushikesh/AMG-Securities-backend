@@ -2,7 +2,134 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import nodemailer from 'nodemailer';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 import User from '../Models/User.js';
+
+const uploadBasePath = path.join(process.cwd(), 'uploads');
+const storage = multer.diskStorage({
+  destination(req, file, cb) {
+    const userId = req.params.id;
+    const dest = path.join(uploadBasePath, userId);
+    fs.mkdirSync(dest, { recursive: true });
+    cb(null, dest);
+  },
+  filename(req, file, cb) {
+    const extension = path.extname(file.originalname) || '';
+    cb(null, `${file.fieldname}${extension}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+export const uploadUserDocumentsMiddleware = upload.fields([
+  { name: 'aadharCard', maxCount: 1 },
+  { name: 'panCard', maxCount: 1 },
+  { name: 'bankDetails', maxCount: 1 },
+  { name: 'qualification', maxCount: 1 },
+  { name: 'policeVerification', maxCount: 1 },
+]);
+
+function makePublicPath(userId, filename) {
+  return `/uploads/${userId}/${filename}`;
+}
+
+export async function uploadUserDocuments(req, res) {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    if (!name) {
+      return res.status(400).json({ error: 'Missing name' });
+    }
+
+    if (!req.user || !req.user.role) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const allowedSelf = req.user.id === id;
+    const allowedManager = ['admin', 'manager'].includes(req.user.role);
+    if (!allowedSelf && !allowedManager) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const files = req.files || {};
+    const requiredFields = ['aadharCard', 'panCard', 'bankDetails', 'qualification', 'policeVerification'];
+
+    for (const field of requiredFields) {
+      if (!files[field] || !files[field].length) {
+        return res.status(400).json({ error: `Missing ${field} file upload` });
+      }
+    }
+
+    const documents = {
+      name,
+      aadharCard: makePublicPath(id, files.aadharCard[0].filename),
+      panCard: makePublicPath(id, files.panCard[0].filename),
+      bankDetails: makePublicPath(id, files.bankDetails[0].filename),
+      qualification: makePublicPath(id, files.qualification[0].filename),
+      policeVerification: makePublicPath(id, files.policeVerification[0].filename),
+      uploadedAt: new Date(),
+    };
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { documents },
+      { returnDocument: 'after', runValidators: true, context: 'query' }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({ message: 'Documents uploaded successfully', documents: user.documents });
+  } catch (err) {
+    console.error('Upload documents error:', err);
+    return res.status(500).json({ error: 'Server error uploading documents' });
+  }
+}
+
+export async function getUserDocuments(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    if (!req.user || !req.user.role) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const allowedSelf = req.user.id === id;
+    const allowedAdmin = req.user.role === 'admin';
+    if (!allowedSelf && !allowedAdmin) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const user = await User.findById(id).select('documents').lean().exec();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.documents || Object.keys(user.documents).length === 0) {
+      return res.status(404).json({ error: 'No documents found for this user' });
+    }
+
+    return res.json({ documents: user.documents });
+  } catch (err) {
+    console.error('Fetch documents error:', err);
+    return res.status(500).json({ error: 'Server error fetching documents' });
+  }
+}
 
 export async function register(req, res) {
   try {
@@ -66,7 +193,7 @@ export async function getAllUsers(req, res) {
     return res.json({ users });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'Server error ' });
   }
 }
 

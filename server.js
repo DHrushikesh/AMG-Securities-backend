@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
+import path from "path";
 import amg_router from "./Routes/amg-user.js";
 
 dotenv.config();
@@ -20,6 +21,7 @@ mongoose
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use("/amg-securities", amg_router);
 
 app.listen(PORT, () => {
