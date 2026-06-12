@@ -26,9 +26,9 @@ amg_router.get('/admin-area', authenticate, adminOnly, (req, res) => {
 amg_router.get('/manager-area', authenticate, managerOnly, (req, res) => {
   res.json({ message: 'Manager access granted', user: req.user });
 });
-// Dcocuments routes
-amg_router.post('/users/:id/documents', authenticate, uploadUserDocumentsMiddleware, uploadUserDocuments);
-amg_router.get('/users/:id/documents', authenticate, getUserDocuments);
+// Documents routes
+amg_router.post('/users/:id/uploaddocuments', authenticate, uploadUserDocumentsMiddleware, uploadUserDocuments);
+amg_router.get('/users/:id/getdocuments', authenticate, getUserDocuments);
 
 amg_router.get('/user-area', authenticate, userOnly, (req, res) => {
   res.json({ message: 'User access granted', user: req.user });
